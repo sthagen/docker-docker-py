@@ -1,6 +1,43 @@
 Change log
 ==========
 
+4.2.0
+-----
+
+[List of PRs / issues for this release](https://github.com/docker/docker-py/milestone/63?closed=1)
+
+### Bugfixes
+
+- Fix `win32pipe.WaitNamedPipe` throw exception in Windows containers
+- Use `Hostname`, `Username`, `Port` and `ProxyCommand` settings from `.ssh/config` when on SSH
+- Set host key policy for ssh transport to `paramiko.WarningPolicy()`
+- Set logging level of `paramiko` to warn
+
+### Features
+
+- Add support for docker contexts through `docker.ContextAPI`
+
+4.1.0
+-----
+
+[List of PRs / issues for this release](https://github.com/docker/docker-py/milestone/61?closed=1)
+
+### Bugfixes
+
+- Correct `INDEX_URL` logic in build.py _set_auth_headers
+- Fix for empty auth keys in config.json
+
+### Features
+
+- Add `NetworkAttachmentConfig` for service create/update
+
+### Miscellaneous
+
+- Bump pytest to 4.3.1
+- Adjust `--platform` tests for changes in docker engine
+- Update credentials-helpers to v0.6.3
+
+
 4.0.2
 -----
 

@@ -17,7 +17,7 @@ def buildImage = { name, buildargs, pyTag ->
 }
 
 def buildImages = { ->
-  wrappedNode(label: "ubuntu && !zfs && amd64", cleanWorkspace: true) {
+  wrappedNode(label: "amd64 && ubuntu-1804 && overlay2", cleanWorkspace: true) {
     stage("build image") {
       checkout(scm)
 
@@ -31,8 +31,8 @@ def buildImages = { ->
 }
 
 def getDockerVersions = { ->
-  def dockerVersions = ["19.03.5"]
-  wrappedNode(label: "ubuntu && !zfs && amd64") {
+  def dockerVersions = ["19.03.12"]
+  wrappedNode(label: "amd64 && ubuntu-1804 && overlay2") {
     def result = sh(script: """docker run --rm \\
         --entrypoint=python \\
         ${imageNamePy3} \\
@@ -66,14 +66,14 @@ def runTests = { Map settings ->
     throw new Exception("Need test image object, e.g.: `runTests(testImage: img)`")
   }
   if (!dockerVersion) {
-    throw new Exception("Need Docker version to test, e.g.: `runTests(dockerVersion: '1.12.3')`")
+    throw new Exception("Need Docker version to test, e.g.: `runTests(dockerVersion: '19.03.12')`")
   }
   if (!pythonVersion) {
     throw new Exception("Need Python version being tested, e.g.: `runTests(pythonVersion: 'py2.7')`")
   }
 
   { ->
-    wrappedNode(label: "ubuntu && !zfs && amd64", cleanWorkspace: true) {
+    wrappedNode(label: "amd64 && ubuntu-1804 && overlay2", cleanWorkspace: true) {
       stage("test python=${pythonVersion} / docker=${dockerVersion}") {
         checkout(scm)
         def dindContainerName = "dpy-dind-\$BUILD_NUMBER-\$EXECUTOR_NUMBER-${pythonVersion}-${dockerVersion}"

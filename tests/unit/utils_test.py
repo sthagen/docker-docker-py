@@ -5,26 +5,20 @@ import json
 import os
 import os.path
 import shutil
-import sys
 import tempfile
 import unittest
 
-
+import pytest
+import six
 from docker.api.client import APIClient
-from docker.constants import IS_WINDOWS_PLATFORM
+from docker.constants import IS_WINDOWS_PLATFORM, DEFAULT_DOCKER_API_VERSION
 from docker.errors import DockerException
-from docker.utils import (
-    convert_filters, convert_volume_binds, decode_json_header, kwargs_from_env,
-    parse_bytes, parse_devices, parse_env_file, parse_host,
-    parse_repository_tag, split_command, update_headers,
-)
-
+from docker.utils import (convert_filters, convert_volume_binds,
+                          decode_json_header, kwargs_from_env, parse_bytes,
+                          parse_devices, parse_env_file, parse_host,
+                          parse_repository_tag, split_command, update_headers)
 from docker.utils.ports import build_port_bindings, split_port
 from docker.utils.utils import format_environment
-
-import pytest
-
-import six
 
 TEST_CERT_DIR = os.path.join(
     os.path.dirname(__file__),
@@ -41,7 +35,7 @@ class DecoratorsTest(unittest.TestCase):
         def f(self, headers=None):
             return headers
 
-        client = APIClient()
+        client = APIClient(version=DEFAULT_DOCKER_API_VERSION)
         client._general_configs = {}
 
         g = update_headers(f)
@@ -92,6 +86,7 @@ class KwargsFromEnvTest(unittest.TestCase):
         assert kwargs['tls'].verify
 
         parsed_host = parse_host(kwargs['base_url'], IS_WINDOWS_PLATFORM, True)
+        kwargs['version'] = DEFAULT_DOCKER_API_VERSION
         try:
             client = APIClient(**kwargs)
             assert parsed_host == client.base_url
@@ -112,6 +107,7 @@ class KwargsFromEnvTest(unittest.TestCase):
         assert kwargs['tls'].assert_hostname is True
         assert kwargs['tls'].verify is False
         parsed_host = parse_host(kwargs['base_url'], IS_WINDOWS_PLATFORM, True)
+        kwargs['version'] = DEFAULT_DOCKER_API_VERSION
         try:
             client = APIClient(**kwargs)
             assert parsed_host == client.base_url
@@ -447,11 +443,7 @@ class ParseBytesTest(unittest.TestCase):
             parse_bytes("127.0.0.1K")
 
     def test_parse_bytes_float(self):
-        with pytest.raises(DockerException):
-            parse_bytes("1.5k")
-
-    def test_parse_bytes_maxint(self):
-        assert parse_bytes("{0}k".format(sys.maxsize)) == sys.maxsize * 1024
+        assert parse_bytes("1.5k") == 1536
 
 
 class UtilsTest(unittest.TestCase):

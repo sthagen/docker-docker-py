@@ -81,10 +81,18 @@ class ImageApiMixin(object):
                 If the server returns an error.
         """
         params = {
-            'filter': name,
             'only_ids': 1 if quiet else 0,
             'all': 1 if all else 0,
         }
+        if name:
+            if utils.version_lt(self._version, '1.25'):
+                # only use "filter" on API 1.24 and under, as it is deprecated
+                params['filter'] = name
+            else:
+                if filters:
+                    filters['reference'] = name
+                else:
+                    filters = {'reference': name}
         if filters:
             params['filters'] = utils.convert_filters(filters)
         res = self._result(self._get(self._url("/images/json"), params=params),
@@ -343,13 +351,14 @@ class ImageApiMixin(object):
         return self._result(self._post(url, params=params), True)
 
     def pull(self, repository, tag=None, stream=False, auth_config=None,
-             decode=False, platform=None):
+             decode=False, platform=None, all_tags=False):
         """
         Pulls an image. Similar to the ``docker pull`` command.
 
         Args:
             repository (str): The repository to pull
-            tag (str): The tag to pull
+            tag (str): The tag to pull. If ``tag`` is ``None`` or empty, it
+                is set to ``latest``.
             stream (bool): Stream the output as a generator. Make sure to
                 consume the generator, otherwise pull might get cancelled.
             auth_config (dict): Override the credentials that are found in the
@@ -358,6 +367,8 @@ class ImageApiMixin(object):
             decode (bool): Decode the JSON data from the server into dicts.
                 Only applies with ``stream=True``
             platform (str): Platform in the format ``os[/arch[/variant]]``
+            all_tags (bool): Pull all image tags, the ``tag`` parameter is
+                ignored.
 
         Returns:
             (generator or str): The output
@@ -382,8 +393,12 @@ class ImageApiMixin(object):
             }
 
         """
-        if not tag:
-            repository, tag = utils.parse_repository_tag(repository)
+        repository, image_tag = utils.parse_repository_tag(repository)
+        tag = tag or image_tag or 'latest'
+
+        if all_tags:
+            tag = None
+
         registry, repo_name = auth.resolve_repository_name(repository)
 
         params = {

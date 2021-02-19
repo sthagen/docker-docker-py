@@ -1,6 +1,6 @@
 #!groovy
 
-def imageNameBase = "dockerbuildbot/docker-py"
+def imageNameBase = "dockerpinata/docker-py"
 def imageNamePy2
 def imageNamePy3
 def imageDindSSH
@@ -18,7 +18,7 @@ def buildImage = { name, buildargs, pyTag ->
 }
 
 def buildImages = { ->
-  wrappedNode(label: "amd64 && ubuntu-1804 && overlay2", cleanWorkspace: true) {
+  wrappedNode(label: "amd64 && ubuntu-2004 && overlay2", cleanWorkspace: true) {
     stage("build image") {
       checkout(scm)
 
@@ -36,7 +36,7 @@ def buildImages = { ->
 
 def getDockerVersions = { ->
   def dockerVersions = ["19.03.12"]
-  wrappedNode(label: "amd64 && ubuntu-1804 && overlay2") {
+  wrappedNode(label: "amd64 && ubuntu-2004 && overlay2") {
     def result = sh(script: """docker run --rm \\
         --entrypoint=python \\
         ${imageNamePy3} \\
@@ -77,7 +77,7 @@ def runTests = { Map settings ->
   }
 
   { ->
-    wrappedNode(label: "amd64 && ubuntu-1804 && overlay2", cleanWorkspace: true) {
+    wrappedNode(label: "amd64 && ubuntu-2004 && overlay2", cleanWorkspace: true) {
       stage("test python=${pythonVersion} / docker=${dockerVersion}") {
         checkout(scm)
         def dindContainerName = "dpy-dind-\$BUILD_NUMBER-\$EXECUTOR_NUMBER-${pythonVersion}-${dockerVersion}"
@@ -85,6 +85,13 @@ def runTests = { Map settings ->
         def testNetwork = "dpy-testnet-\$BUILD_NUMBER-\$EXECUTOR_NUMBER-${pythonVersion}-${dockerVersion}"
         withDockerRegistry(credentialsId:'dockerbuildbot-index.docker.io') {
           try {
+            // unit tests
+            sh """docker run --rm \\
+              -e 'DOCKER_TEST_API_VERSION=${apiVersion}' \\
+              ${testImage} \\
+              py.test -v -rxs --cov=docker tests/unit
+            """
+            // integration tests
             sh """docker network create ${testNetwork}"""
             sh """docker run --rm -d --name ${dindContainerName} -v /tmp --privileged --network ${testNetwork} \\
               ${imageDindSSH} dockerd -H tcp://0.0.0.0:2375
@@ -95,9 +102,9 @@ def runTests = { Map settings ->
               -e 'DOCKER_TEST_API_VERSION=${apiVersion}' \\
               --network ${testNetwork} \\
               --volumes-from ${dindContainerName} \\
-              -v ~/.docker/config.json:/root/.docker/config.json \\
+              -v $DOCKER_CONFIG/config.json:/root/.docker/config.json \\
               ${testImage} \\
-              py.test -v -rxs --cov=docker --ignore=tests/ssh tests/
+              py.test -v -rxs --cov=docker tests/integration
             """
             sh """docker stop ${dindContainerName}"""
             // start DIND container with SSH
@@ -111,7 +118,7 @@ def runTests = { Map settings ->
               -e 'DOCKER_TEST_API_VERSION=${apiVersion}' \\
               --network ${testNetwork} \\
               --volumes-from ${dindContainerName} \\
-              -v ~/.docker/config.json:/root/.docker/config.json \\
+              -v $DOCKER_CONFIG/config.json:/root/.docker/config.json \\
               ${testImage} \\
               py.test -v -rxs --cov=docker tests/ssh
             """

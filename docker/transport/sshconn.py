@@ -29,25 +29,37 @@ class SSHSocket(socket.socket):
             socket.AF_INET, socket.SOCK_STREAM)
         self.host = host
         self.port = None
-        if ':' in host:
-            self.host, self.port = host.split(':')
+        self.user = None
+        if ':' in self.host:
+            self.host, self.port = self.host.split(':')
+        if '@' in self.host:
+            self.user, self.host = self.host.split('@')
+
         self.proc = None
 
     def connect(self, **kwargs):
-        port = '' if not self.port else '-p {}'.format(self.port)
-        args = [
-            'ssh',
-            '-q',
-            self.host,
-            port,
-            'docker system dial-stdio'
-        ]
+        args = ['ssh']
+        if self.user:
+            args = args + ['-l', self.user]
+
+        if self.port:
+            args = args + ['-p', self.port]
+
+        args = args + ['--', self.host, 'docker system dial-stdio']
+
+        preexec_func = None
+        if not constants.IS_WINDOWS_PLATFORM:
+            def f():
+                signal.signal(signal.SIGINT, signal.SIG_IGN)
+            preexec_func = f
+
         self.proc = subprocess.Popen(
             ' '.join(args),
+            env=os.environ,
             shell=True,
             stdout=subprocess.PIPE,
             stdin=subprocess.PIPE,
-            preexec_fn=lambda: signal.signal(signal.SIGINT, signal.SIG_IGN))
+            preexec_fn=preexec_func)
 
     def _write(self, data):
         if not self.proc or self.proc.stdin.closed:
@@ -119,9 +131,6 @@ class SSHConnectionPool(urllib3.connectionpool.HTTPConnectionPool):
         if ssh_client:
             self.ssh_transport = ssh_client.get_transport()
         self.ssh_host = host
-        self.ssh_port = None
-        if ':' in host:
-            self.ssh_host, self.ssh_port = host.split(':')
 
     def _new_conn(self):
         return SSHConnection(self.ssh_transport, self.timeout, self.ssh_host)
@@ -158,13 +167,16 @@ class SSHHTTPAdapter(BaseHTTPAdapter):
     def __init__(self, base_url, timeout=60,
                  pool_connections=constants.DEFAULT_NUM_POOLS,
                  max_pool_size=constants.DEFAULT_MAX_POOL_SIZE,
-                 shell_out=True):
+                 shell_out=False):
         self.ssh_client = None
         if not shell_out:
             self._create_paramiko_client(base_url)
             self._connect()
 
-        self.ssh_host = base_url.lstrip('ssh://')
+        self.ssh_host = base_url
+        if base_url.startswith('ssh://'):
+            self.ssh_host = base_url[len('ssh://'):]
+
         self.timeout = timeout
         self.max_pool_size = max_pool_size
         self.pools = RecentlyUsedContainer(

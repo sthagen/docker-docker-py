@@ -7,9 +7,8 @@ import tempfile
 import threading
 
 import pytest
-import six
-from six.moves import BaseHTTPServer
-from six.moves import socketserver
+from http.server import SimpleHTTPRequestHandler
+import socketserver
 
 
 import docker
@@ -33,7 +32,7 @@ class ListImagesTest(BaseAPIIntegrationTest):
 
     def test_images_quiet(self):
         res1 = self.client.images(quiet=True)
-        assert type(res1[0]) == six.text_type
+        assert type(res1[0]) == str
 
 
 class PullImageTest(BaseAPIIntegrationTest):
@@ -44,7 +43,7 @@ class PullImageTest(BaseAPIIntegrationTest):
             pass
         res = self.client.pull('hello-world')
         self.tmp_imgs.append('hello-world')
-        assert type(res) == six.text_type
+        assert type(res) == str
         assert len(self.client.images('hello-world')) >= 1
         img_info = self.client.inspect_image('hello-world')
         assert 'Id' in img_info
@@ -266,14 +265,14 @@ class ImportImageTest(BaseAPIIntegrationTest):
         output = self.client.load_image(data)
         assert any([
             line for line in output
-            if 'Loaded image: {}'.format(test_img) in line.get('stream', '')
+            if f'Loaded image: {test_img}' in line.get('stream', '')
         ])
 
     @contextlib.contextmanager
     def temporary_http_file_server(self, stream):
         '''Serve data from an IO stream over HTTP.'''
 
-        class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
+        class Handler(SimpleHTTPRequestHandler):
             def do_GET(self):
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/x-tar')
@@ -285,7 +284,7 @@ class ImportImageTest(BaseAPIIntegrationTest):
         thread.setDaemon(True)
         thread.start()
 
-        yield 'http://%s:%s' % (socket.gethostname(), server.server_address[1])
+        yield f'http://{socket.gethostname()}:{server.server_address[1]}'
 
         server.shutdown()
 
@@ -351,7 +350,7 @@ class SaveLoadImagesTest(BaseAPIIntegrationTest):
             result = self.client.load_image(f.read())
 
         success = False
-        result_line = 'Loaded image: {}\n'.format(TEST_IMG)
+        result_line = f'Loaded image: {TEST_IMG}\n'
         for data in result:
             print(data)
             if 'stream' in data:

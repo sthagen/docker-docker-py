@@ -1,15 +1,13 @@
 import logging
 import os
 
-import six
-
 from .. import auth, errors, utils
 from ..constants import DEFAULT_DATA_CHUNK_SIZE
 
 log = logging.getLogger(__name__)
 
 
-class ImageApiMixin(object):
+class ImageApiMixin:
 
     @utils.check_resource('image')
     def get_image(self, image, chunk_size=DEFAULT_DATA_CHUNK_SIZE):
@@ -31,7 +29,7 @@ class ImageApiMixin(object):
 
         Example:
 
-            >>> image = cli.get_image("busybox:latest")
+            >>> image = client.api.get_image("busybox:latest")
             >>> f = open('/tmp/busybox-latest.tar', 'wb')
             >>> for chunk in image:
             >>>   f.write(chunk)
@@ -130,7 +128,7 @@ class ImageApiMixin(object):
 
         params = _import_image_params(
             repository, tag, image,
-            src=(src if isinstance(src, six.string_types) else None),
+            src=(src if isinstance(src, str) else None),
             changes=changes
         )
         headers = {'Content-Type': 'application/tar'}
@@ -139,7 +137,7 @@ class ImageApiMixin(object):
             return self._result(
                 self._post(u, data=None, params=params)
             )
-        elif isinstance(src, six.string_types):  # from file path
+        elif isinstance(src, str):  # from file path
             with open(src, 'rb') as f:
                 return self._result(
                     self._post(
@@ -379,7 +377,7 @@ class ImageApiMixin(object):
 
         Example:
 
-            >>> for line in cli.pull('busybox', stream=True, decode=True):
+            >>> for line in client.api.pull('busybox', stream=True, decode=True):
             ...     print(json.dumps(line, indent=4))
             {
                 "status": "Pulling image (latest) from busybox",
@@ -458,7 +456,7 @@ class ImageApiMixin(object):
                 If the server returns an error.
 
         Example:
-            >>> for line in cli.push('yourname/app', stream=True, decode=True):
+            >>> for line in client.api.push('yourname/app', stream=True, decode=True):
             ...   print(line)
             {'status': 'Pushing repository yourname/app (1 tags)'}
             {'status': 'Pushing','progressDetail': {}, 'id': '511136ea3c5a'}
@@ -509,13 +507,14 @@ class ImageApiMixin(object):
         res = self._delete(self._url("/images/{0}", image), params=params)
         return self._result(res, True)
 
-    def search(self, term):
+    def search(self, term, limit=None):
         """
         Search for images on Docker Hub. Similar to the ``docker search``
         command.
 
         Args:
             term (str): A term to search for.
+            limit (int): The maximum number of results to return.
 
         Returns:
             (list of dicts): The response of the search.
@@ -524,8 +523,12 @@ class ImageApiMixin(object):
             :py:class:`docker.errors.APIError`
                 If the server returns an error.
         """
+        params = {'term': term}
+        if limit is not None:
+            params['limit'] = limit
+
         return self._result(
-            self._get(self._url("/images/search"), params={'term': term}),
+            self._get(self._url("/images/search"), params=params),
             True
         )
 
@@ -549,7 +552,7 @@ class ImageApiMixin(object):
 
         Example:
 
-            >>> client.tag('ubuntu', 'localhost:5000/ubuntu', 'latest',
+            >>> client.api.tag('ubuntu', 'localhost:5000/ubuntu', 'latest',
                            force=True)
         """
         params = {
@@ -566,7 +569,7 @@ class ImageApiMixin(object):
 def is_file(src):
     try:
         return (
-            isinstance(src, six.string_types) and
+            isinstance(src, str) and
             os.path.isfile(src)
         )
     except TypeError:  # a data string will make isfile() raise a TypeError

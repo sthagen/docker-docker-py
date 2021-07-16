@@ -2,7 +2,7 @@ appdirs==1.4.3
 asn1crypto==0.22.0
 backports.ssl-match-hostname==3.5.0.1
 cffi==1.14.4
-cryptography==3.2
+cryptography==3.4.7
 enum34==1.1.6
 idna==2.5
 ipaddress==1.0.18
@@ -13,6 +13,5 @@ pyOpenSSL==18.0.0
 pyparsing==2.2.0
 pywin32==227; sys_platform == 'win32'
 requests==2.20.0
-six==1.10.0
 urllib3==1.24.3
 websocket-client==0.56.0

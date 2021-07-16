@@ -7,7 +7,6 @@ from datetime import datetime
 
 import pytest
 import requests
-import six
 
 import docker
 from .. import helpers
@@ -35,7 +34,7 @@ class ListContainersTest(BaseAPIIntegrationTest):
         assert len(retrieved) == 1
         retrieved = retrieved[0]
         assert 'Command' in retrieved
-        assert retrieved['Command'] == six.text_type('true')
+        assert retrieved['Command'] == 'true'
         assert 'Image' in retrieved
         assert re.search(r'alpine:.*', retrieved['Image'])
         assert 'Status' in retrieved
@@ -104,13 +103,11 @@ class CreateContainerTest(BaseAPIIntegrationTest):
         self.client.start(container3_id)
         assert self.client.wait(container3_id)['StatusCode'] == 0
 
-        logs = self.client.logs(container3_id)
-        if six.PY3:
-            logs = logs.decode('utf-8')
-        assert '{0}_NAME='.format(link_env_prefix1) in logs
-        assert '{0}_ENV_FOO=1'.format(link_env_prefix1) in logs
-        assert '{0}_NAME='.format(link_env_prefix2) in logs
-        assert '{0}_ENV_FOO=1'.format(link_env_prefix2) in logs
+        logs = self.client.logs(container3_id).decode('utf-8')
+        assert f'{link_env_prefix1}_NAME=' in logs
+        assert f'{link_env_prefix1}_ENV_FOO=1' in logs
+        assert f'{link_env_prefix2}_NAME=' in logs
+        assert f'{link_env_prefix2}_ENV_FOO=1' in logs
 
     def test_create_with_restart_policy(self):
         container = self.client.create_container(
@@ -227,9 +224,7 @@ class CreateContainerTest(BaseAPIIntegrationTest):
         self.client.start(container)
         self.client.wait(container)
 
-        logs = self.client.logs(container)
-        if six.PY3:
-            logs = logs.decode('utf-8')
+        logs = self.client.logs(container).decode('utf-8')
         groups = logs.strip().split(' ')
         assert '1000' in groups
         assert '1001' in groups
@@ -244,9 +239,7 @@ class CreateContainerTest(BaseAPIIntegrationTest):
         self.client.start(container)
         self.client.wait(container)
 
-        logs = self.client.logs(container)
-        if six.PY3:
-            logs = logs.decode('utf-8')
+        logs = self.client.logs(container).decode('utf-8')
 
         groups = logs.strip().split(' ')
         assert '1000' in groups
@@ -494,7 +487,7 @@ class CreateContainerTest(BaseAPIIntegrationTest):
 )
 class VolumeBindTest(BaseAPIIntegrationTest):
     def setUp(self):
-        super(VolumeBindTest, self).setUp()
+        super().setUp()
 
         self.mount_dest = '/mnt'
 
@@ -515,10 +508,7 @@ class VolumeBindTest(BaseAPIIntegrationTest):
             TEST_IMG,
             ['ls', self.mount_dest],
         )
-        logs = self.client.logs(container)
-
-        if six.PY3:
-            logs = logs.decode('utf-8')
+        logs = self.client.logs(container).decode('utf-8')
         assert self.filename in logs
         inspect_data = self.client.inspect_container(container)
         self.check_container_data(inspect_data, True)
@@ -534,10 +524,8 @@ class VolumeBindTest(BaseAPIIntegrationTest):
             TEST_IMG,
             ['ls', self.mount_dest],
         )
-        logs = self.client.logs(container)
+        logs = self.client.logs(container).decode('utf-8')
 
-        if six.PY3:
-            logs = logs.decode('utf-8')
         assert self.filename in logs
 
         inspect_data = self.client.inspect_container(container)
@@ -554,9 +542,7 @@ class VolumeBindTest(BaseAPIIntegrationTest):
             host_config=host_config
         )
         assert container
-        logs = self.client.logs(container)
-        if six.PY3:
-            logs = logs.decode('utf-8')
+        logs = self.client.logs(container).decode('utf-8')
         assert self.filename in logs
         inspect_data = self.client.inspect_container(container)
         self.check_container_data(inspect_data, True)
@@ -573,9 +559,7 @@ class VolumeBindTest(BaseAPIIntegrationTest):
             host_config=host_config
         )
         assert container
-        logs = self.client.logs(container)
-        if six.PY3:
-            logs = logs.decode('utf-8')
+        logs = self.client.logs(container).decode('utf-8')
         assert self.filename in logs
         inspect_data = self.client.inspect_container(container)
         self.check_container_data(inspect_data, False)
@@ -634,7 +618,7 @@ class ArchiveTest(BaseAPIIntegrationTest):
     def test_get_file_archive_from_container(self):
         data = 'The Maid and the Pocket Watch of Blood'
         ctnr = self.client.create_container(
-            TEST_IMG, 'sh -c "echo {0} > /vol1/data.txt"'.format(data),
+            TEST_IMG, f'sh -c "echo {data} > /vol1/data.txt"',
             volumes=['/vol1']
         )
         self.tmp_containers.append(ctnr)
@@ -645,15 +629,14 @@ class ArchiveTest(BaseAPIIntegrationTest):
             for d in strm:
                 destination.write(d)
             destination.seek(0)
-            retrieved_data = helpers.untar_file(destination, 'data.txt')
-            if six.PY3:
-                retrieved_data = retrieved_data.decode('utf-8')
+            retrieved_data = helpers.untar_file(destination, 'data.txt')\
+                .decode('utf-8')
             assert data == retrieved_data.strip()
 
     def test_get_file_stat_from_container(self):
         data = 'The Maid and the Pocket Watch of Blood'
         ctnr = self.client.create_container(
-            TEST_IMG, 'sh -c "echo -n {0} > /vol1/data.txt"'.format(data),
+            TEST_IMG, f'sh -c "echo -n {data} > /vol1/data.txt"',
             volumes=['/vol1']
         )
         self.tmp_containers.append(ctnr)
@@ -672,7 +655,7 @@ class ArchiveTest(BaseAPIIntegrationTest):
             test_file.seek(0)
             ctnr = self.client.create_container(
                 TEST_IMG,
-                'cat {0}'.format(
+                'cat {}'.format(
                     os.path.join('/vol1/', os.path.basename(test_file.name))
                 ),
                 volumes=['/vol1']
@@ -683,9 +666,6 @@ class ArchiveTest(BaseAPIIntegrationTest):
         self.client.start(ctnr)
         self.client.wait(ctnr)
         logs = self.client.logs(ctnr)
-        if six.PY3:
-            logs = logs.decode('utf-8')
-            data = data.decode('utf-8')
         assert logs.strip() == data
 
     def test_copy_directory_to_container(self):
@@ -700,9 +680,7 @@ class ArchiveTest(BaseAPIIntegrationTest):
             self.client.put_archive(ctnr, '/vol1', test_tar)
         self.client.start(ctnr)
         self.client.wait(ctnr)
-        logs = self.client.logs(ctnr)
-        if six.PY3:
-            logs = logs.decode('utf-8')
+        logs = self.client.logs(ctnr).decode('utf-8')
         results = logs.strip().split()
         assert 'a.py' in results
         assert 'b.py' in results
@@ -723,7 +701,7 @@ class RenameContainerTest(BaseAPIIntegrationTest):
         if version == '1.5.0':
             assert name == inspect['Name']
         else:
-            assert '/{0}'.format(name) == inspect['Name']
+            assert f'/{name}' == inspect['Name']
 
 
 class StartContainerTest(BaseAPIIntegrationTest):
@@ -829,7 +807,7 @@ class LogsTest(BaseAPIIntegrationTest):
     def test_logs(self):
         snippet = 'Flowering Nights (Sakuya Iyazoi)'
         container = self.client.create_container(
-            TEST_IMG, 'echo {0}'.format(snippet)
+            TEST_IMG, f'echo {snippet}'
         )
         id = container['Id']
         self.tmp_containers.append(id)
@@ -843,7 +821,7 @@ class LogsTest(BaseAPIIntegrationTest):
         snippet = '''Line1
 Line2'''
         container = self.client.create_container(
-            TEST_IMG, 'echo "{0}"'.format(snippet)
+            TEST_IMG, f'echo "{snippet}"'
         )
         id = container['Id']
         self.tmp_containers.append(id)
@@ -856,12 +834,12 @@ Line2'''
     def test_logs_streaming_and_follow(self):
         snippet = 'Flowering Nights (Sakuya Iyazoi)'
         container = self.client.create_container(
-            TEST_IMG, 'echo {0}'.format(snippet)
+            TEST_IMG, f'echo {snippet}'
         )
         id = container['Id']
         self.tmp_containers.append(id)
         self.client.start(id)
-        logs = six.binary_type()
+        logs = b''
         for chunk in self.client.logs(id, stream=True, follow=True):
             logs += chunk
 
@@ -876,12 +854,12 @@ Line2'''
     def test_logs_streaming_and_follow_and_cancel(self):
         snippet = 'Flowering Nights (Sakuya Iyazoi)'
         container = self.client.create_container(
-            TEST_IMG, 'sh -c "echo \\"{0}\\" && sleep 3"'.format(snippet)
+            TEST_IMG, f'sh -c "echo \\"{snippet}\\" && sleep 3"'
         )
         id = container['Id']
         self.tmp_containers.append(id)
         self.client.start(id)
-        logs = six.binary_type()
+        logs = b''
 
         generator = self.client.logs(id, stream=True, follow=True)
         threading.Timer(1, generator.close).start()
@@ -894,7 +872,7 @@ Line2'''
     def test_logs_with_dict_instead_of_id(self):
         snippet = 'Flowering Nights (Sakuya Iyazoi)'
         container = self.client.create_container(
-            TEST_IMG, 'echo {0}'.format(snippet)
+            TEST_IMG, f'echo {snippet}'
         )
         id = container['Id']
         self.tmp_containers.append(id)
@@ -907,7 +885,7 @@ Line2'''
     def test_logs_with_tail_0(self):
         snippet = 'Flowering Nights (Sakuya Iyazoi)'
         container = self.client.create_container(
-            TEST_IMG, 'echo "{0}"'.format(snippet)
+            TEST_IMG, f'echo "{snippet}"'
         )
         id = container['Id']
         self.tmp_containers.append(id)
@@ -921,7 +899,7 @@ Line2'''
     def test_logs_with_until(self):
         snippet = 'Shanghai Teahouse (Hong Meiling)'
         container = self.client.create_container(
-            TEST_IMG, 'echo "{0}"'.format(snippet)
+            TEST_IMG, f'echo "{snippet}"'
         )
 
         self.tmp_containers.append(container)
@@ -1117,7 +1095,7 @@ class ContainerTopTest(BaseAPIIntegrationTest):
         self.client.start(container)
         res = self.client.top(container)
         if not IS_WINDOWS_PLATFORM:
-            assert res['Titles'] == [u'PID', u'USER', u'TIME', u'COMMAND']
+            assert res['Titles'] == ['PID', 'USER', 'TIME', 'COMMAND']
         assert len(res['Processes']) == 1
         assert res['Processes'][0][-1] == 'sleep 60'
         self.client.kill(container)
@@ -1135,7 +1113,7 @@ class ContainerTopTest(BaseAPIIntegrationTest):
 
         self.client.start(container)
         res = self.client.top(container, '-eopid,user')
-        assert res['Titles'] == [u'PID', u'USER']
+        assert res['Titles'] == ['PID', 'USER']
         assert len(res['Processes']) == 1
         assert res['Processes'][0][10] == 'sleep 60'
 
@@ -1225,7 +1203,7 @@ class AttachContainerTest(BaseAPIIntegrationTest):
     def test_run_container_reading_socket(self):
         line = 'hi there and stuff and things, words!'
         # `echo` appends CRLF, `printf` doesn't
-        command = "printf '{0}'".format(line)
+        command = f"printf '{line}'"
         container = self.client.create_container(TEST_IMG, command,
                                                  detach=True, tty=False)
         self.tmp_containers.append(container)
@@ -1509,7 +1487,7 @@ class LinkTest(BaseAPIIntegrationTest):
 
         # Remove link
         linked_name = self.client.inspect_container(container2_id)['Name'][1:]
-        link_name = '%s/%s' % (linked_name, link_alias)
+        link_name = f'{linked_name}/{link_alias}'
         self.client.remove_container(link_name, link=True)
 
         # Link is gone

@@ -1,10 +1,10 @@
 import json
 import struct
+import urllib
 from functools import partial
 
 import requests
 import requests.exceptions
-import six
 import websocket
 
 from .. import auth
@@ -107,7 +107,7 @@ class APIClient(
                  user_agent=DEFAULT_USER_AGENT, num_pools=None,
                  credstore_env=None, use_ssh_client=False,
                  max_pool_size=DEFAULT_MAX_POOL_SIZE):
-        super(APIClient, self).__init__()
+        super().__init__()
 
         if tls and not base_url:
             raise TLSParameterError(
@@ -192,14 +192,14 @@ class APIClient(
         # version detection needs to be after unix adapter mounting
         if version is None or (isinstance(
                                 version,
-                                six.string_types
+                                str
                                 ) and version.lower() == 'auto'):
             self._version = self._retrieve_server_version()
         else:
             self._version = version
-        if not isinstance(self._version, six.string_types):
+        if not isinstance(self._version, str):
             raise DockerException(
-                'Version parameter must be a string or None. Found {0}'.format(
+                'Version parameter must be a string or None. Found {}'.format(
                     type(version).__name__
                 )
             )
@@ -219,7 +219,7 @@ class APIClient(
             )
         except Exception as e:
             raise DockerException(
-                'Error while fetching server API version: {0}'.format(e)
+                f'Error while fetching server API version: {e}'
             )
 
     def _set_request_timeout(self, kwargs):
@@ -246,21 +246,21 @@ class APIClient(
 
     def _url(self, pathfmt, *args, **kwargs):
         for arg in args:
-            if not isinstance(arg, six.string_types):
+            if not isinstance(arg, str):
                 raise ValueError(
-                    'Expected a string but found {0} ({1}) '
+                    'Expected a string but found {} ({}) '
                     'instead'.format(arg, type(arg))
                 )
 
-        quote_f = partial(six.moves.urllib.parse.quote, safe="/:")
+        quote_f = partial(urllib.parse.quote, safe="/:")
         args = map(quote_f, args)
 
         if kwargs.get('versioned_api', True):
-            return '{0}/v{1}{2}'.format(
+            return '{}/v{}{}'.format(
                 self.base_url, self._version, pathfmt.format(*args)
             )
         else:
-            return '{0}{1}'.format(self.base_url, pathfmt.format(*args))
+            return f'{self.base_url}{pathfmt.format(*args)}'
 
     def _raise_for_status(self, response):
         """Raises stored :class:`APIError`, if one occurred."""
@@ -284,7 +284,7 @@ class APIClient(
         # so we do this disgusting thing here.
         data2 = {}
         if data is not None and isinstance(data, dict):
-            for k, v in six.iteritems(data):
+            for k, v in iter(data.items()):
                 if v is not None:
                     data2[k] = v
         elif data is not None:
@@ -320,12 +320,10 @@ class APIClient(
             sock = response.raw._fp.fp.raw.sock
         elif self.base_url.startswith('http+docker://ssh'):
             sock = response.raw._fp.fp.channel
-        elif six.PY3:
+        else:
             sock = response.raw._fp.fp.raw
             if self.base_url.startswith("https://"):
                 sock = sock._sock
-        else:
-            sock = response.raw._fp.fp._sock
         try:
             # Keep a reference to the response to stop it being garbage
             # collected. If the response is garbage collected, it will
@@ -343,8 +341,7 @@ class APIClient(
 
         if response.raw._fp.chunked:
             if decode:
-                for chunk in json_stream(self._stream_helper(response, False)):
-                    yield chunk
+                yield from json_stream(self._stream_helper(response, False))
             else:
                 reader = response.raw
                 while not reader.closed:
@@ -400,8 +397,7 @@ class APIClient(
     def _stream_raw_result(self, response, chunk_size=1, decode=True):
         ''' Stream result for TTY-enabled container and raw binary data'''
         self._raise_for_status(response)
-        for out in response.iter_content(chunk_size, decode):
-            yield out
+        yield from response.iter_content(chunk_size, decode)
 
     def _read_from_socket(self, response, stream, tty=True, demux=False):
         socket = self._get_raw_response_socket(response)
@@ -465,7 +461,7 @@ class APIClient(
                 self._result(res, binary=True)
 
         self._raise_for_status(res)
-        sep = six.binary_type()
+        sep = b''
         if stream:
             return self._multiplexed_response_stream_helper(res)
         else:
@@ -479,7 +475,7 @@ class APIClient(
 
     def get_adapter(self, url):
         try:
-            return super(APIClient, self).get_adapter(url)
+            return super().get_adapter(url)
         except requests.exceptions.InvalidSchema as e:
             if self._custom_adapter:
                 return self._custom_adapter

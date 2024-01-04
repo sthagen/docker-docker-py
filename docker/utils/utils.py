@@ -5,8 +5,9 @@ import os
 import os.path
 import shlex
 import string
-from datetime import datetime
-from packaging.version import Version
+from datetime import datetime, timezone
+from functools import lru_cache
+from itertools import zip_longest
 
 from .. import errors
 from ..constants import DEFAULT_HTTP_HOST
@@ -43,6 +44,7 @@ def decode_json_header(header):
     return json.loads(data)
 
 
+@lru_cache(maxsize=None)
 def compare_version(v1, v2):
     """Compare docker versions
 
@@ -55,14 +57,20 @@ def compare_version(v1, v2):
     >>> compare_version(v2, v2)
     0
     """
-    s1 = Version(v1)
-    s2 = Version(v2)
-    if s1 == s2:
+    if v1 == v2:
         return 0
-    elif s1 > s2:
-        return -1
-    else:
-        return 1
+    # Split into `sys.version_info` like tuples.
+    s1 = tuple(int(p) for p in v1.split('.'))
+    s2 = tuple(int(p) for p in v2.split('.'))
+    # Compare each component, padding with 0 if necessary.
+    for c1, c2 in zip_longest(s1, s2, fillvalue=0):
+        if c1 == c2:
+            continue
+        elif c1 > c2:
+            return -1
+        else:
+            return 1
+    return 0
 
 
 def version_lt(v1, v2):
@@ -152,7 +160,7 @@ def convert_volume_binds(binds):
             ]
             if 'propagation' in v and v['propagation'] in propagation_modes:
                 if mode:
-                    mode = ','.join([mode, v['propagation']])
+                    mode = f"{mode},{v['propagation']}"
                 else:
                     mode = v['propagation']
 
@@ -394,8 +402,8 @@ def convert_filters(filters):
 
 
 def datetime_to_timestamp(dt):
-    """Convert a UTC datetime to a Unix timestamp"""
-    delta = dt - datetime.utcfromtimestamp(0)
+    """Convert a datetime to a Unix timestamp"""
+    delta = dt.astimezone(timezone.utc) - datetime(1970, 1, 1, tzinfo=timezone.utc)
     return delta.seconds + delta.days * 24 * 3600
 
 

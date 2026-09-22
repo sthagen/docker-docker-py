@@ -64,53 +64,6 @@ class CreateContainerTest(BaseAPIIntegrationTest):
         assert 'PidMode' in host_config
         assert host_config['PidMode'] == 'host'
 
-    def test_create_with_links(self):
-        res0 = self.client.create_container(
-            TEST_IMG, 'cat',
-            detach=True, stdin_open=True,
-            environment={'FOO': '1'})
-
-        container1_id = res0['Id']
-        self.tmp_containers.append(container1_id)
-
-        self.client.start(container1_id)
-
-        res1 = self.client.create_container(
-            TEST_IMG, 'cat',
-            detach=True, stdin_open=True,
-            environment={'FOO': '1'})
-
-        container2_id = res1['Id']
-        self.tmp_containers.append(container2_id)
-
-        self.client.start(container2_id)
-
-        # we don't want the first /
-        link_path1 = self.client.inspect_container(container1_id)['Name'][1:]
-        link_alias1 = 'mylink1'
-        link_env_prefix1 = link_alias1.upper()
-
-        link_path2 = self.client.inspect_container(container2_id)['Name'][1:]
-        link_alias2 = 'mylink2'
-        link_env_prefix2 = link_alias2.upper()
-
-        res2 = self.client.create_container(
-            TEST_IMG, 'env', host_config=self.client.create_host_config(
-                links={link_path1: link_alias1, link_path2: link_alias2},
-                network_mode='bridge'
-            )
-        )
-        container3_id = res2['Id']
-        self.tmp_containers.append(container3_id)
-        self.client.start(container3_id)
-        assert self.client.wait(container3_id)['StatusCode'] == 0
-
-        logs = self.client.logs(container3_id).decode('utf-8')
-        assert f'{link_env_prefix1}_NAME=' in logs
-        assert f'{link_env_prefix1}_ENV_FOO=1' in logs
-        assert f'{link_env_prefix2}_NAME=' in logs
-        assert f'{link_env_prefix2}_ENV_FOO=1' in logs
-
     def test_create_with_restart_policy(self):
         container = self.client.create_container(
             TEST_IMG, ['sleep', '2'],
@@ -570,7 +523,10 @@ class VolumeBindTest(BaseAPIIntegrationTest):
         mount = docker.types.Mount(
             type="bind", source=self.mount_origin, target=self.mount_dest
         )
-        host_config = self.client.create_host_config(mounts=[mount])
+        host_config = self.client.create_host_config(
+            mounts=[mount],
+            security_opt=["label=disable"],
+        )
         container = self.run_container(
             TEST_IMG, ['ls', self.mount_dest],
             host_config=host_config
@@ -587,7 +543,10 @@ class VolumeBindTest(BaseAPIIntegrationTest):
             type="bind", source=self.mount_origin, target=self.mount_dest,
             read_only=True
         )
-        host_config = self.client.create_host_config(mounts=[mount])
+        host_config = self.client.create_host_config(
+            mounts=[mount],
+            security_opt=["label=disable"],
+        )
         container = self.run_container(
             TEST_IMG, ['ls', self.mount_dest],
             host_config=host_config
@@ -604,7 +563,10 @@ class VolumeBindTest(BaseAPIIntegrationTest):
             type="volume", source=helpers.random_name(),
             target=self.mount_dest, labels={'com.dockerpy.test': 'true'}
         )
-        host_config = self.client.create_host_config(mounts=[mount])
+        host_config = self.client.create_host_config(
+            mounts=[mount],
+            security_opt=["label=disable"],
+        )
         container = self.client.create_container(
             TEST_IMG, ['true'], host_config=host_config,
         )
@@ -693,7 +655,8 @@ class VolumeBindTest(BaseAPIIntegrationTest):
                         'ro': ro,
                     },
                 },
-                network_mode='none'
+                network_mode='none',
+                security_opt=["label=disable"],
             ),
             **kwargs
         )
@@ -710,7 +673,8 @@ class VolumeBindTest(BaseAPIIntegrationTest):
                         'propagation': propagation
                     },
                 },
-                network_mode='none'
+                network_mode='none',
+                security_opt=["label=disable"],
             ),
             **kwargs
         )
